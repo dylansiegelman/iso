@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Isometric Drawing App</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
   <style>
@@ -10,6 +10,12 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    canvas {
+      display: block;
     }
   </style>
 </head>
@@ -259,6 +265,10 @@ function doubleClicked() {
 
 function mouseWheel(event) {
   if (mouseX < 60) return;
+  
+  // Prevent default browser zoom
+  event.preventDefault();
+  
   let worldBefore = screenToWorld(mouseX, mouseY);
   let zoomFactor = 1 - event.delta * 0.001;
   zoom = constrain(zoom * zoomFactor, minZoom, maxZoom);
