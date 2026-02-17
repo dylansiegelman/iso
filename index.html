@@ -289,8 +289,9 @@ function touchStarted() {
     let dx = touches[0].x - touches[1].x;
     let dy = touches[0].y - touches[1].y;
     lastTouchDist = Math.sqrt(dx * dx + dy * dy);
-    return false;
+    return false; // Prevent default only for pinch
   }
+  // Let single touch pass through for drawing/UI
 }
 
 function touchMoved() {
@@ -321,15 +322,16 @@ function touchMoved() {
       
       lastTouchDist = currentDist;
     }
-    return false;
+    return false; // Prevent default only for pinch
   }
+  // Let single touch pass through for drawing
 }
 
 function touchEnded() {
   if (touches.length < 2) {
     isPinching = false;
   }
-  return false;
+  // Let single touch pass through for drawing/UI
 }
 
 function keyPressed() {
