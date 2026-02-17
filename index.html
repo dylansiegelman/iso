@@ -66,6 +66,33 @@ function setup() {
 
 function draw() {
   background(220);
+  
+  // Handle pinch-to-zoom for touch devices
+  if (touches.length === 2) {
+    let dx = touches[0].x - touches[1].x;
+    let dy = touches[0].y - touches[1].y;
+    let currentDist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (isPinching) {
+      let centerX = (touches[0].x + touches[1].x) / 2;
+      let centerY = (touches[0].y + touches[1].y) / 2;
+      
+      if (centerX > 60) {
+        let worldBefore = screenToWorld(centerX, centerY);
+        let zoomChange = currentDist / lastTouchDist;
+        zoom = constrain(zoom * zoomChange, minZoom, maxZoom);
+        let worldAfter = screenToWorld(centerX, centerY);
+        panX += (worldAfter.x - worldBefore.x) * zoom;
+        panY += (worldAfter.y - worldBefore.y) * zoom;
+      }
+    } else {
+      isPinching = true;
+    }
+    lastTouchDist = currentDist;
+  } else {
+    isPinching = false;
+  }
+  
   push();
   translate(panX, panY);
   scale(zoom);
@@ -280,58 +307,6 @@ function mouseWheel(event) {
   panX += (worldAfter.x - worldBefore.x) * zoom;
   panY += (worldAfter.y - worldBefore.y) * zoom;
   return false;
-}
-
-function touchStarted() {
-  if (touches.length === 2) {
-    // Two finger pinch
-    isPinching = true;
-    let dx = touches[0].x - touches[1].x;
-    let dy = touches[0].y - touches[1].y;
-    lastTouchDist = Math.sqrt(dx * dx + dy * dy);
-    return false; // Prevent default only for pinch
-  }
-  // Let single touch pass through for drawing/UI
-}
-
-function touchMoved() {
-  if (touches.length === 2 && isPinching) {
-    // Calculate distance between two touches
-    let dx = touches[0].x - touches[1].x;
-    let dy = touches[0].y - touches[1].y;
-    let currentDist = Math.sqrt(dx * dx + dy * dy);
-    
-    // Calculate center point of pinch
-    let centerX = (touches[0].x + touches[1].x) / 2;
-    let centerY = (touches[0].y + touches[1].y) / 2;
-    
-    if (centerX > 60) { // Not over UI
-      // Get world position before zoom
-      let worldBefore = screenToWorld(centerX, centerY);
-      
-      // Calculate zoom change
-      let zoomChange = currentDist / lastTouchDist;
-      zoom = constrain(zoom * zoomChange, minZoom, maxZoom);
-      
-      // Get world position after zoom
-      let worldAfter = screenToWorld(centerX, centerY);
-      
-      // Adjust pan to keep pinch center stable
-      panX += (worldAfter.x - worldBefore.x) * zoom;
-      panY += (worldAfter.y - worldBefore.y) * zoom;
-      
-      lastTouchDist = currentDist;
-    }
-    return false; // Prevent default only for pinch
-  }
-  // Let single touch pass through for drawing
-}
-
-function touchEnded() {
-  if (touches.length < 2) {
-    isPinching = false;
-  }
-  // Let single touch pass through for drawing/UI
 }
 
 function keyPressed() {
