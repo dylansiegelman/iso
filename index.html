@@ -65,36 +65,34 @@ function setup() {
   fills.clear();
   createUI();
   
-  // Handle all touch events natively so p5 mouse events work cleanly for drawing
+  // Prevent browser pinch-zoom on the canvas
   let canvas = document.querySelector('canvas');
   
-  canvas.addEventListener('gesturestart', e => e.preventDefault());
-  canvas.addEventListener('gesturechange', e => e.preventDefault());
-  canvas.addEventListener('gestureend', e => e.preventDefault());
+  canvas.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+  });
   
-  canvas.addEventListener('touchstart', function(e) {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      isPinching = true;
-      // Cancel any active drawing when pinch starts
-      drawStart = null;
-      isFingerDown = false;
-      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-      let dx = e.touches[0].clientX - e.touches[1].clientX;
-      let dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastTouchDist = Math.sqrt(dx * dx + dy * dy);
-    }
-  }, { passive: false });
+  canvas.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+  });
   
-  canvas.addEventListener('touchmove', function(e) {
-    if (e.touches.length === 2 && isPinching) {
-      e.preventDefault();
-      let dx = e.touches[0].clientX - e.touches[1].clientX;
-      let dy = e.touches[0].clientY - e.touches[1].clientY;
-      let currentDist = Math.sqrt(dx * dx + dy * dy);
-      
-      let centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      let centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+  canvas.addEventListener('gestureend', function(e) {
+    e.preventDefault();
+  });
+}
+
+function draw() {
+  background(220);
+  
+  // Handle pinch-to-zoom for touch devices
+  if (touches.length === 2) {
+    let dx = touches[0].x - touches[1].x;
+    let dy = touches[0].y - touches[1].y;
+    let currentDist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (isPinching) {
+      let centerX = (touches[0].x + touches[1].x) / 2;
+      let centerY = (touches[0].y + touches[1].y) / 2;
       
       if (centerX > 60) {
         let worldBefore = screenToWorld(centerX, centerY);
@@ -104,22 +102,14 @@ function setup() {
         panX += (worldAfter.x - worldBefore.x) * zoom;
         panY += (worldAfter.y - worldBefore.y) * zoom;
       }
-      lastTouchDist = currentDist;
+    } else {
+      isPinching = true;
     }
-  }, { passive: false });
+    lastTouchDist = currentDist;
+  } else {
+    isPinching = false;
+  }
   
-  canvas.addEventListener('touchend', function(e) {
-    if (e.touches.length < 2) {
-      isPinching = false;
-      // Reset drawing state cleanly after pinch ends
-      drawStart = null;
-      isFingerDown = false;
-    }
-  }, { passive: false });
-}
-
-function draw() {
-  background(220);
   push();
   translate(panX, panY);
   scale(zoom);
@@ -301,11 +291,10 @@ function mouseDragged() {
 function mouseReleased() {
   isFingerDown = false;
   isPanning = false;
-  if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-  
-  // Don't commit lines during or just after a pinch
-  if (isPinching) { drawStart = null; isEditingVertex = false; return; }
-  
+  if (holdTimer) {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  }
   if (currentTool === 'DRAW' && drawStart) {
     let worldMouse = screenToWorld(mouseX, mouseY);
     let snapped = snapToGrid(worldMouse.x, worldMouse.y);
