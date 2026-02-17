@@ -45,6 +45,7 @@ let hueSlider;
 let drawStart = null;
 let isEditingVertex = false;
 let holdTimer = null;
+let isFingerDown = false; // Reliable touch tracking for iPad
 
 // Panning state
 let isPanning = false;
@@ -119,7 +120,7 @@ function draw() {
   for (let ln of lines) {
     line(ln.x1, ln.y1, ln.x2, ln.y2);
   }
-  if (drawStart && currentTool === 'DRAW' && mouseIsPressed) {
+  if (drawStart && currentTool === 'DRAW' && (mouseIsPressed || isFingerDown)) {
     let worldMouse = screenToWorld(mouseX, mouseY);
     let snapped = snapToGrid(worldMouse.x, worldMouse.y);
     stroke(0);
@@ -193,6 +194,7 @@ function snapToGrid(worldX, worldY) {
 }
 
 function mousePressed() {
+  isFingerDown = true;
   if (mouseX < 60) return;
   if (mouseButton === CENTER || keyIsDown(32)) {
     isPanning = true;
@@ -228,7 +230,7 @@ function mousePressed() {
       let holdStartX = mouseX;
       let holdStartY = mouseY;
       holdTimer = setTimeout(() => {
-        if (mouseIsPressed && dist(mouseX, mouseY, holdStartX, holdStartY) < 3) {
+        if (isFingerDown && dist(mouseX, mouseY, holdStartX, holdStartY) < 10) {
           let bestDist = 10 / zoom;
           let nearestLine = -1;
           let useEnd1 = false;
@@ -261,12 +263,15 @@ function mousePressed() {
   }
   else if (currentTool === 'FILL') {
     saveUndo();
-    fills.push();
-    fills.colorMode(HSB, 360, 100, 100);
-    let fillColor = fills.color(currentHue, 70, 90);
-    fills.pop();
+    // Create color in HSB without corrupting main canvas state
+    let h = currentHue;
+    let fillR = red(color(`hsl(${h}, 70%, 80%)`));
+    let fillG = green(color(`hsl(${h}, 70%, 80%)`));
+    let fillB = blue(color(`hsl(${h}, 70%, 80%)`));
+    let fillColor = color(fillR, fillG, fillB);
     let bufCoords = worldToBuffer(worldMouse.x, worldMouse.y);
     floodFill(bufCoords.x, bufCoords.y, fillColor);
+    drawStart = null; // Reset draw state after fill
   }
   else if (currentTool === 'ERASE') {
     saveUndo();
@@ -283,6 +288,7 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
+  isFingerDown = false;
   isPanning = false;
   if (holdTimer) {
     clearTimeout(holdTimer);
