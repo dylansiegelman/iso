@@ -15,6 +15,7 @@
     }
     canvas {
       display: block;
+      touch-action: manipulation;
     }
   </style>
 </head>
@@ -64,23 +65,18 @@ function setup() {
   
   // Prevent browser pinch-zoom on the canvas
   let canvas = document.querySelector('canvas');
-  canvas.addEventListener('touchstart', function(e) {
-    if (e.touches.length > 1) {
-      e.preventDefault();
-    }
-  }, { passive: false });
   
-  canvas.addEventListener('touchmove', function(e) {
-    if (e.touches.length > 1) {
-      e.preventDefault();
-    }
-  }, { passive: false });
+  canvas.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+  });
   
-  canvas.addEventListener('touchend', function(e) {
-    if (e.touches.length > 1) {
-      e.preventDefault();
-    }
-  }, { passive: false });
+  canvas.addEventListener('gesturechange', function(e) {
+    e.preventDefault();
+  });
+  
+  canvas.addEventListener('gestureend', function(e) {
+    e.preventDefault();
+  });
 }
 
 function draw() {
