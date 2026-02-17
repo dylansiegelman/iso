@@ -308,6 +308,22 @@ function mouseWheel(event) {
   return false;
 }
 
+function touchStarted() {
+  // Only handle 2-finger gestures here
+  if (touches.length === 2) {
+    return false; // Prevent default for pinch
+  }
+  // Don't return false for single touch - let p5 handle it normally
+}
+
+function touchMoved() {
+  // Only prevent default for 2-finger gestures
+  if (touches.length === 2) {
+    return false; // Prevent browser pinch zoom
+  }
+  // Don't return false for single touch - let p5 handle it normally
+}
+
 function keyPressed() {
   if (key === '+' || key === '=') zoom = constrain(zoom * 1.2, minZoom, maxZoom);
   else if (key === '-' || key === '_') zoom = constrain(zoom / 1.2, minZoom, maxZoom);
