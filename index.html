@@ -1,4 +1,20 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Isometric Drawing App</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <script>
 // ===== STATE VARIABLES =====
 let lines = [];
 let fills;
@@ -10,7 +26,7 @@ let zoom = 1;
 let minZoom = 0.19, maxZoom = 5;
 
 // Grid settings - angled isometric (30°/150° lines)
-let gridSpacing = 80; // Increased for better visibility
+let gridSpacing = 80;
 let baseGridSpacing = 80;
 let gridMult = 1;
 
@@ -29,200 +45,110 @@ let isPanning = false;
 let panStartMouse = {x: 0, y: 0};
 let panStartOffset = {x: 0, y: 0};
 
-// ===== SETUP =====
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  
-  // Smaller, dynamic fill buffer for performance
   fills = createGraphics(2000, 2000);
-  fills.pixelDensity(1); // Force consistent pixel density
+  fills.pixelDensity(1);
   fills.colorMode(HSB, 360, 100, 100);
   fills.clear();
-  
   createUI();
 }
 
-// ===== MAIN DRAW LOOP =====
 function draw() {
   background(220);
-  
-  // Apply camera transform
   push();
   translate(panX, panY);
   scale(zoom);
-  
-  // Draw fills layer centered
   let offset = fills.width / 2;
   image(fills, -offset, -offset);
-  
-  // Draw grid
   drawIsometricGrid();
-  
-  // Draw all lines
   stroke(0);
   strokeWeight(2 / zoom);
   for (let ln of lines) {
     line(ln.x1, ln.y1, ln.x2, ln.y2);
   }
-  
-  // Draw preview line while drawing
   if (drawStart && currentTool === 'DRAW' && mouseIsPressed) {
     let worldMouse = screenToWorld(mouseX, mouseY);
     let snapped = snapToGrid(worldMouse.x, worldMouse.y);
-    
     stroke(0);
     strokeWeight(2 / zoom);
     line(drawStart.x, drawStart.y, snapped.x, snapped.y);
-    
-    // Show red handle if editing
     if (isEditingVertex) {
       fill(255, 0, 0);
       noStroke();
       ellipse(snapped.x, snapped.y, 8 / zoom);
     }
   }
-  
   pop();
-  
-  // Update UI
   hueSlider.style('background', `hsl(${hueSlider.value()}, 70%, 50%)`);
   updateButtonStyles();
 }
 
-// ===== GRID RENDERING =====
 function drawIsometricGrid() {
-  // Don't draw grid if too zoomed out
   if (zoom < 0.1) return;
-  
   stroke(100);
   strokeWeight(0.5 / zoom);
   noFill();
-  
-  // Calculate visible area in world space
   let topLeft = screenToWorld(0, 0);
   let bottomRight = screenToWorld(width, height);
-  
-  // Add margin
   let margin = gridSpacing * 5;
   let minX = topLeft.x - margin;
   let maxX = bottomRight.x + margin;
   let minY = topLeft.y - margin;
   let maxY = bottomRight.y + margin;
-  
-  // For isometric: 3 sets of parallel lines
-  // Set 1: Vertical lines
-  // Set 2: 30° angle (slope = tan(30°) = 0.577)
-  // Set 3: 150° angle (slope = -tan(30°) = -0.577)
-  
-  let tan30 = 1 / Math.sqrt(3); // ~0.577
-  
-  // The perpendicular spacing between parallel lines should all be gridSpacing
-  // For angled lines, the vertical spacing is gridSpacing / sin(60°) = gridSpacing * 2 / sqrt(3)
+  let tan30 = 1 / Math.sqrt(3);
   let verticalSpacing = gridSpacing * 2 / Math.sqrt(3);
-  
-  // Vertical lines
   let startCol = floor(minX / gridSpacing);
   let endCol = ceil(maxX / gridSpacing);
   for (let col = startCol; col <= endCol; col++) {
     let x = col * gridSpacing;
     line(x, minY, x, maxY);
   }
-  
-  // 30° lines (slope up-right)
-  // y = tan30 * x + offset
   let startOffset1 = floor((minY - tan30 * maxX) / verticalSpacing);
   let endOffset1 = ceil((maxY - tan30 * minX) / verticalSpacing);
-  
   for (let i = startOffset1; i <= endOffset1; i++) {
     let c = i * verticalSpacing;
-    let x1 = minX;
-    let y1 = tan30 * x1 + c;
-    let x2 = maxX;
-    let y2 = tan30 * x2 + c;
-    line(x1, y1, x2, y2);
+    line(minX, tan30 * minX + c, maxX, tan30 * maxX + c);
   }
-  
-  // 150° lines (slope down-right)
-  // y = -tan30 * x + offset
   let startOffset2 = floor((minY + tan30 * minX) / verticalSpacing);
   let endOffset2 = ceil((maxY + tan30 * maxX) / verticalSpacing);
-  
   for (let i = startOffset2; i <= endOffset2; i++) {
     let c = i * verticalSpacing;
-    let x1 = minX;
-    let y1 = -tan30 * x1 + c;
-    let x2 = maxX;
-    let y2 = -tan30 * x2 + c;
-    line(x1, y1, x2, y2);
+    line(minX, -tan30 * minX + c, maxX, -tan30 * maxX + c);
   }
 }
 
-// ===== COORDINATE CONVERSION =====
 function screenToWorld(sx, sy) {
-  return {
-    x: (sx - panX) / zoom,
-    y: (sy - panY) / zoom
-  };
-}
-
-function worldToScreen(wx, wy) {
-  return {
-    x: wx * zoom + panX,
-    y: wy * zoom + panY
-  };
+  return {x: (sx - panX) / zoom, y: (sy - panY) / zoom};
 }
 
 function worldToBuffer(wx, wy) {
   let offset = fills.width / 2;
-  return {
-    x: floor(wx + offset),
-    y: floor(wy + offset)
-  };
+  return {x: floor(wx + offset), y: floor(wy + offset)};
 }
 
-// ===== GRID SNAPPING =====
 function snapToGrid(worldX, worldY) {
-  // Snap to intersection of isometric grid lines
-  // The grid intersections form a triangular lattice
-  
   let cos30 = cos(PI / 6);
   let sin30 = sin(PI / 6);
-  
-  // Convert to isometric coordinates
-  // Using basis vectors: (gridSpacing, 0) and (gridSpacing*cos30, gridSpacing*sin30)
   let spacing = gridSpacing;
-  
-  // Project onto the two basis directions
   let u = worldX / spacing;
   let v = (worldY - worldX * sin30 / cos30) / (spacing * sin30 / cos30);
-  
-  // Round to nearest grid point
   u = Math.round(u);
   v = Math.round(v);
-  
-  // Convert back to world coordinates
   let snapX = u * spacing;
   let snapY = v * spacing * sin30 / cos30 + snapX * sin30 / cos30;
-  
   return {x: snapX, y: snapY};
 }
 
-// ===== MOUSE EVENTS =====
 function mousePressed() {
-  // Check if clicking on UI
   if (mouseX < 60) return;
-  
-  // Handle panning (middle mouse or space+click)
-  if (mouseButton === CENTER || (keyIsDown(32))) {
+  if (mouseButton === CENTER || keyIsDown(32)) {
     isPanning = true;
     panStartMouse = {x: mouseX, y: mouseY};
     panStartOffset = {x: panX, y: panY};
     return;
   }
-  
   let worldMouse = screenToWorld(mouseX, mouseY);
-  
-  // EYEDROPPER
   if (currentTool === 'PICK') {
     let bufCoords = worldToBuffer(worldMouse.x, worldMouse.y);
     let c = fills.get(bufCoords.x, bufCoords.y);
@@ -232,41 +158,32 @@ function mousePressed() {
       currentTool = 'FILL';
     }
   }
-  
-  // DRAW
   else if (currentTool === 'DRAW') {
     isEditingVertex = false;
     let clickWorld = {x: worldMouse.x, y: worldMouse.y};
-    
-    // Check if we're near a vertex BEFORE starting the timer
-    let nearestDist = 10 / zoom; // Much tighter radius
+    let nearestDist = 10 / zoom;
     let nearVertex = false;
-    
     for (let i = 0; i < lines.length; i++) {
       let ln = lines[i];
       let d1 = dist(clickWorld.x, clickWorld.y, ln.x1, ln.y1);
       let d2 = dist(clickWorld.x, clickWorld.y, ln.x2, ln.y2);
-      
       if (d1 < nearestDist || d2 < nearestDist) {
         nearVertex = true;
         break;
       }
     }
-    
-    // Only start edit timer if we're near a vertex
     if (nearVertex) {
+      let holdStartX = mouseX;
+      let holdStartY = mouseY;
       holdTimer = setTimeout(() => {
-        if (mouseIsPressed) {
-          // Find nearest vertex again
-          let bestDist = 10 / zoom; // Same tighter radius
+        if (mouseIsPressed && dist(mouseX, mouseY, holdStartX, holdStartY) < 3) {
+          let bestDist = 10 / zoom;
           let nearestLine = -1;
           let useEnd1 = false;
-          
           for (let i = 0; i < lines.length; i++) {
             let ln = lines[i];
             let d1 = dist(clickWorld.x, clickWorld.y, ln.x1, ln.y1);
             let d2 = dist(clickWorld.x, clickWorld.y, ln.x2, ln.y2);
-            
             if (d1 < bestDist) {
               bestDist = d1;
               nearestLine = i;
@@ -277,7 +194,6 @@ function mousePressed() {
               useEnd1 = false;
             }
           }
-          
           if (nearestLine >= 0) {
             saveUndo();
             isEditingVertex = true;
@@ -288,12 +204,9 @@ function mousePressed() {
         }
       }, 1000);
     }
-    
     let snapped = snapToGrid(worldMouse.x, worldMouse.y);
     drawStart = snapped;
   }
-  
-  // FILL
   else if (currentTool === 'FILL') {
     saveUndo();
     fills.push();
@@ -303,14 +216,10 @@ function mousePressed() {
     let bufCoords = worldToBuffer(worldMouse.x, worldMouse.y);
     floodFill(bufCoords.x, bufCoords.y, fillColor);
   }
-  
-  // ERASE
   else if (currentTool === 'ERASE') {
     saveUndo();
     let threshold = 15 / zoom;
-    lines = lines.filter(ln => {
-      return distToSegment(worldMouse.x, worldMouse.y, ln.x1, ln.y1, ln.x2, ln.y2) > threshold;
-    });
+    lines = lines.filter(ln => distToSegment(worldMouse.x, worldMouse.y, ln.x1, ln.y1, ln.x2, ln.y2) > threshold);
   }
 }
 
@@ -323,27 +232,18 @@ function mouseDragged() {
 
 function mouseReleased() {
   isPanning = false;
-  
   if (holdTimer) {
     clearTimeout(holdTimer);
     holdTimer = null;
   }
-  
   if (currentTool === 'DRAW' && drawStart) {
     let worldMouse = screenToWorld(mouseX, mouseY);
     let snapped = snapToGrid(worldMouse.x, worldMouse.y);
-    
     if (dist(drawStart.x, drawStart.y, snapped.x, snapped.y) > 5) {
       if (!isEditingVertex) saveUndo();
-      lines.push({
-        x1: drawStart.x,
-        y1: drawStart.y,
-        x2: snapped.x,
-        y2: snapped.y
-      });
+      lines.push({x1: drawStart.x, y1: drawStart.y, x2: snapped.x, y2: snapped.y});
     }
   }
-  
   drawStart = null;
   isEditingVertex = false;
 }
@@ -357,123 +257,66 @@ function doubleClicked() {
   }
 }
 
-// ===== MOUSE WHEEL ZOOM =====
 function mouseWheel(event) {
   if (mouseX < 60) return;
-  
-  // Get world position before zoom
   let worldBefore = screenToWorld(mouseX, mouseY);
-  
-  // Update zoom
   let zoomFactor = 1 - event.delta * 0.001;
   zoom = constrain(zoom * zoomFactor, minZoom, maxZoom);
-  
-  // Get world position after zoom
   let worldAfter = screenToWorld(mouseX, mouseY);
-  
-  // Adjust pan to keep same world point under mouse
   panX += (worldAfter.x - worldBefore.x) * zoom;
   panY += (worldAfter.y - worldBefore.y) * zoom;
-  
   return false;
 }
 
-// ===== KEYBOARD =====
 function keyPressed() {
-  if (key === '+' || key === '=') {
-    zoom = constrain(zoom * 1.2, minZoom, maxZoom);
-  } else if (key === '-' || key === '_') {
-    zoom = constrain(zoom / 1.2, minZoom, maxZoom);
-  } else if (key === '0') {
-    panX = 0;
-    panY = 0;
-    zoom = 1;
-  }
+  if (key === '+' || key === '=') zoom = constrain(zoom * 1.2, minZoom, maxZoom);
+  else if (key === '-' || key === '_') zoom = constrain(zoom / 1.2, minZoom, maxZoom);
+  else if (key === '0') { panX = 0; panY = 0; zoom = 1; }
 }
 
-// ===== FLOOD FILL (FIXED) =====
 function floodFill(startX, startY, fillColor, isErasing = false) {
   let bufferWidth = fills.width;
   let bufferHeight = fills.height;
-  
-  // Bounds check
-  if (startX < 0 || startX >= bufferWidth || startY < 0 || startY >= bufferHeight) {
-    return;
-  }
-  
-  // Create mask at same size as fill buffer
+  if (startX < 0 || startX >= bufferWidth || startY < 0 || startY >= bufferHeight) return;
   let mask = createGraphics(bufferWidth, bufferHeight);
-  mask.pixelDensity(1); // Force pixel density to 1 for consistent behavior
+  mask.pixelDensity(1);
   mask.background(255);
   mask.stroke(0);
-  mask.strokeWeight(2.5); // Thinner mask for tighter fill
+  mask.strokeWeight(2.5);
   mask.strokeCap(ROUND);
-  mask.strokeJoin(ROUND); // Round joins too
-  
-  // Draw lines with offset to match fill buffer coordinate system
+  mask.strokeJoin(ROUND);
   let offset = bufferWidth / 2;
   mask.push();
   mask.translate(offset, offset);
-  
-  for (let ln of lines) {
-    mask.line(ln.x1, ln.y1, ln.x2, ln.y2);
-  }
-  
+  for (let ln of lines) mask.line(ln.x1, ln.y1, ln.x2, ln.y2);
   mask.pop();
-  
-  // Load pixels
   mask.loadPixels();
-  
-  // Check if starting on a line in the mask
   let maskStartIdx = (startY * bufferWidth + startX) * 4;
   if (mask.pixels[maskStartIdx] < 128) {
     mask.remove();
-    return; // Can't fill if starting on a line
+    return;
   }
-  
-  // Stack-based flood fill
   let stack = [[startX, startY]];
   let visited = new Uint8Array(bufferWidth * bufferHeight);
   let maxIterations = 300000;
   let iterations = 0;
-  
   while (stack.length > 0 && iterations < maxIterations) {
     iterations++;
     let [x, y] = stack.pop();
-    
-    // Bounds check
     if (x < 0 || x >= bufferWidth || y < 0 || y >= bufferHeight) continue;
-    
-    // Check if visited
     let key = y * bufferWidth + x;
     if (visited[key]) continue;
-    
-    // Check mask - if black (line), stop
     let maskIdx = key * 4;
     if (mask.pixels[maskIdx] < 128) continue;
-    
-    // Mark as visited
     visited[key] = 1;
-    
-    // Fill this pixel
-    if (isErasing) {
-      fills.set(x, y, color(0, 0, 0, 0));
-    } else {
-      fills.set(x, y, fillColor);
-    }
-    
-    // Add neighbors (4-directional)
-    stack.push([x + 1, y]);
-    stack.push([x - 1, y]);
-    stack.push([x, y + 1]);
-    stack.push([x, y - 1]);
+    if (isErasing) fills.set(x, y, color(0, 0, 0, 0));
+    else fills.set(x, y, fillColor);
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
   }
-  
   fills.updatePixels();
   mask.remove();
 }
 
-// ===== UNDO =====
 function saveUndo() {
   undoStack.push({
     lines: lines.map(l => ({...l})),
@@ -482,10 +325,7 @@ function saveUndo() {
     panY: panY,
     zoom: zoom
   });
-  
-  if (undoStack.length > 25) {
-    undoStack.shift();
-  }
+  if (undoStack.length > 25) undoStack.shift();
 }
 
 function undo() {
@@ -500,14 +340,9 @@ function undo() {
   }
 }
 
-// ===== UI =====
 function createUI() {
-  // Sidebar background
   createDiv('').position(0, 0).size(60, height).style('background', '#ddd').style('border-right', '2px solid #999');
-  
-  let yPos = height * 0.15 - 36; // Move everything up by one button height
-  
-  // Hue slider
+  let yPos = height * 0.15 - 36;
   hueSlider = createSlider(0, 360, 200)
     .position(-45, yPos + 45)
     .size(140)
@@ -515,93 +350,64 @@ function createUI() {
     .style('appearance', 'none')
     .style('height', '10px')
     .style('border-radius', '5px');
-  
   hueSlider.input(() => currentHue = hueSlider.value());
-  
   yPos += 140;
-  
-  // Tool buttons
   let tools = [
     {icon: '✏️', mode: 'DRAW'},
     {icon: '🪣', mode: 'FILL'},
     {icon: '🎨', mode: 'PICK'},
     {icon: '🧽', mode: 'ERASE'}
   ];
-  
   for (let tool of tools) {
-    let btn = createButton(tool.icon)
-      .position(12, yPos)
-      .size(36, 36)
-      .mousePressed(() => currentTool = tool.mode);
+    let btn = createButton(tool.icon).position(12, yPos).size(36, 36).mousePressed(() => currentTool = tool.mode);
     btn.attribute('data-mode', tool.mode);
     yPos += 40;
   }
-  
   yPos += 10;
-  
-  // Function buttons
   createButton('↩️').position(12, yPos).size(36, 36).mousePressed(undo);
   yPos += 40;
-  
   createButton('🌐').position(12, yPos).size(36, 36).mousePressed(() => {
     saveUndo();
-    gridMult = gridMult === 1 ? 0.5 : (gridMult === 0.5 ? 0.25 : 1);
+    gridMult = gridMult === 1 ? 0.5 : (gridMult === 0.5 ? 0.25 : (gridMult === 0.25 ? 0.125 : 1));
     gridSpacing = baseGridSpacing * gridMult;
   });
   yPos += 40;
-  
   createButton('⌂').position(12, yPos).size(36, 36).mousePressed(() => {
     panX = 0;
     panY = 0;
     zoom = 1;
   });
   yPos += 40;
-  
   createButton('🗑️').position(12, yPos).size(36, 36).mousePressed(() => {
     saveUndo();
     lines = [];
     fills.clear();
   });
   yPos += 40;
-  
   createButton('💾').position(12, yPos).size(36, 36).mousePressed(savePNG);
 }
 
 function savePNG() {
-  // iPad Pro 12.9" landscape resolution (2732 x 2048)
   let exportWidth = 2732;
   let exportHeight = 2048;
-  
   let exportGraphics = createGraphics(exportWidth, exportHeight);
   exportGraphics.pixelDensity(1);
-  exportGraphics.background(220); // Same gray as canvas
-  
-  // Calculate scale to fit canvas viewport into export size
-  // Account for the 60px sidebar
+  exportGraphics.background(220);
   let viewportWidth = width - 60;
   let viewportHeight = height;
   let scaleX = exportWidth / viewportWidth;
   let scaleY = exportHeight / viewportHeight;
-  
   exportGraphics.push();
-  // Apply scaled transform
   exportGraphics.translate(panX * scaleX, panY * scaleY);
   exportGraphics.scale(zoom * scaleX, zoom * scaleY);
-  
-  // Draw fills
   let offset = fills.width / 2;
   exportGraphics.image(fills, -offset, -offset);
-  
-  // Draw lines (NO GRID)
   exportGraphics.stroke(0);
   exportGraphics.strokeWeight(2 / zoom);
   for (let ln of lines) {
     exportGraphics.line(ln.x1, ln.y1, ln.x2, ln.y2);
   }
-  
   exportGraphics.pop();
-  
-  // Save the image
   save(exportGraphics, 'isometric_drawing.png');
   exportGraphics.remove();
 }
@@ -618,15 +424,13 @@ function updateButtonStyles() {
   });
 }
 
-// ===== UTILITY =====
 function distToSegment(px, py, x1, y1, x2, y2) {
   let l2 = dist(x1, y1, x2, y2) ** 2;
   if (l2 === 0) return dist(px, py, x1, y1);
-  
   let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
   t = constrain(t, 0, 1);
-  
   return dist(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
 }
-
-</script>
+  </script>
+</body>
+</html>
