@@ -10,12 +10,12 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
-      touch-action: none;
       user-select: none;
       -webkit-user-select: none;
     }
     canvas {
       display: block;
+      touch-action: none;
     }
   </style>
 </head>
@@ -50,6 +50,10 @@ let holdTimer = null;
 let isPanning = false;
 let panStartMouse = {x: 0, y: 0};
 let panStartOffset = {x: 0, y: 0};
+
+// Touch/pinch state
+let lastTouchDist = 0;
+let isPinching = false;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -275,6 +279,56 @@ function mouseWheel(event) {
   let worldAfter = screenToWorld(mouseX, mouseY);
   panX += (worldAfter.x - worldBefore.x) * zoom;
   panY += (worldAfter.y - worldBefore.y) * zoom;
+  return false;
+}
+
+function touchStarted() {
+  if (touches.length === 2) {
+    // Two finger pinch
+    isPinching = true;
+    let dx = touches[0].x - touches[1].x;
+    let dy = touches[0].y - touches[1].y;
+    lastTouchDist = Math.sqrt(dx * dx + dy * dy);
+    return false;
+  }
+}
+
+function touchMoved() {
+  if (touches.length === 2 && isPinching) {
+    // Calculate distance between two touches
+    let dx = touches[0].x - touches[1].x;
+    let dy = touches[0].y - touches[1].y;
+    let currentDist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calculate center point of pinch
+    let centerX = (touches[0].x + touches[1].x) / 2;
+    let centerY = (touches[0].y + touches[1].y) / 2;
+    
+    if (centerX > 60) { // Not over UI
+      // Get world position before zoom
+      let worldBefore = screenToWorld(centerX, centerY);
+      
+      // Calculate zoom change
+      let zoomChange = currentDist / lastTouchDist;
+      zoom = constrain(zoom * zoomChange, minZoom, maxZoom);
+      
+      // Get world position after zoom
+      let worldAfter = screenToWorld(centerX, centerY);
+      
+      // Adjust pan to keep pinch center stable
+      panX += (worldAfter.x - worldBefore.x) * zoom;
+      panY += (worldAfter.y - worldBefore.y) * zoom;
+      
+      lastTouchDist = currentDist;
+    }
+    return false;
+  }
+}
+
+function touchEnded() {
+  if (touches.length < 2) {
+    isPinching = false;
+  }
   return false;
 }
 
